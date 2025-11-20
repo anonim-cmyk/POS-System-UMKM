@@ -70,6 +70,7 @@ const BottomNav = () => {
         className={`flex items-center justify-center py-2 gap-2 w-[200px] ${
           isActive("/more") ? "bg-[#343434] rounded-md" : "text-[#ababab]"
         }`}
+        onClick={() => navigate("/more")}
       >
         <CiCircleMore size={30} />
         More

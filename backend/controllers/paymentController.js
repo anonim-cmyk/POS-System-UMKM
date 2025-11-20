@@ -21,9 +21,36 @@ const core = new midtransClient.CoreApi({
 // ===========================================================
 const createOrder = async (req, res, next) => {
   try {
-    const { order_id, gross_amount, customer_name, email, tableNo, tableId } =
-      req.body;
+    const {
+      order_id,
+      gross_amount,
+      customer_name = "Guest",
+      customer_phone = "-",
+      tableNo,
+      tableId,
+      method,
+    } = req.body;
 
+    // 💵 Cash payment
+    if (method?.toLowerCase() === "cash") {
+      await Payment.create({
+        orderId: order_id,
+        amount: gross_amount,
+        currency: "IDR",
+        status: "success",
+        method: "cash",
+        customerName: customer_name,
+        customerPhone: customer_phone,
+        tableNo,
+        tableId,
+        createdAt: new Date(),
+      });
+      return res
+        .status(200)
+        .json({ success: true, message: "Cash payment recorded" });
+    }
+
+    // Validasi Online Payment
     if (!gross_amount || gross_amount <= 0) {
       return res
         .status(400)
@@ -33,25 +60,24 @@ const createOrder = async (req, res, next) => {
     const orderId = order_id || `ORDER-${Date.now()}`;
     const roundedAmount = Math.round(gross_amount);
 
-    // 🔹 Data transaksi
+    // Buat transaksi Midtrans
     const parameter = {
       transaction_details: {
         order_id: orderId,
         gross_amount: roundedAmount,
       },
       customer_details: {
-        first_name: customer_name || "Guest",
-        email: email || "guest@example.com",
+        first_name: customer_name,
+        phone: customer_phone,
       },
       credit_card: {
         secure: true,
       },
     };
 
-    // 🔹 Request ke Midtrans
     const transaction = await snap.createTransaction(parameter);
 
-    // 🔹 Simpan data pembayaran ke DB
+    // Simpan payment Online ke DB
     await Payment.create({
       paymentId: transaction.token,
       orderId,
@@ -59,13 +85,13 @@ const createOrder = async (req, res, next) => {
       currency: "IDR",
       status: "pending",
       method: "midtrans",
-      email: email || "guest@example.com",
+      customerName: customer_name,
+      customerPhone: customer_phone,
       tableNo,
       tableId,
       createdAt: new Date(),
     });
 
-    // 🔹 Kirim response ke frontend
     return res.status(200).json({
       success: true,
       token: transaction.token,
@@ -97,17 +123,34 @@ const verifyPayment = async (req, res, next) => {
     const statusResponse = await core.transaction.status(order_id);
     console.log("✅ Midtrans Status Response:", statusResponse);
 
-    // 🔹 Update status di DB
+    const transactionStatus = statusResponse.transaction_status;
+    const fraudStatus = statusResponse.fraud_status;
+
+    // 🔹 Mapping status Midtrans → status aplikasi kamu
+    let newStatus = "pending";
+    if (transactionStatus === "capture" && fraudStatus === "accept") {
+      newStatus = "success";
+    } else if (transactionStatus === "settlement") {
+      newStatus = "success";
+    } else if (
+      transactionStatus === "cancel" ||
+      transactionStatus === "deny" ||
+      transactionStatus === "expire"
+    ) {
+      newStatus = "failed";
+    }
+
+    // 🔹 Update status di DB pakai newStatus
     await Payment.findOneAndUpdate(
       { orderId: order_id },
-      { status: statusResponse.transaction_status },
+      { status: newStatus },
       { new: true }
     );
 
     res.json({
       success: true,
       message: "Payment verified successfully",
-      data: statusResponse,
+      data: { ...statusResponse, appStatus: newStatus },
     });
   } catch (error) {
     console.error("❌ Verify Payment Error:", error);
@@ -188,4 +231,91 @@ const webHookVerification = async (req, res, next) => {
   }
 };
 
-module.exports = { createOrder, verifyPayment, webHookVerification };
+const getAllPayment = async (req, res, next) => {
+  try {
+    const payments = await Payment.find().sort({ createdAt: -1 });
+    res
+      .status(200)
+      .json({ success: true, count: payments.length, data: payments });
+  } catch (error) {
+    console.error("❌ Get Payments Error: ", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch payments",
+    });
+  }
+};
+
+// 📁 controllers/paymentController.js
+const getFilteredPayments = async (req, res) => {
+  try {
+    let { page = 1, limit = 10, status, period } = req.query;
+    page = parseInt(page);
+    limit = parseInt(limit);
+
+    const filter = {};
+
+    // 🟢 Filter by status
+    if (status) {
+      const normalized = status.toLowerCase();
+      if (["success", "pending", "failed"].includes(normalized)) {
+        filter.status = { $regex: new RegExp(`^${normalized}$`, "i") };
+      }
+    }
+
+    // 🗓️ Filter by period (week, month, year)
+    const now = new Date();
+    if (period === "week") {
+      const weekAgo = new Date();
+      weekAgo.setDate(now.getDate() - 7);
+      filter.createdAt = { $gte: weekAgo, $lte: now };
+    } else if (period === "month") {
+      const monthAgo = new Date();
+      monthAgo.setMonth(now.getMonth() - 1);
+      filter.createdAt = { $gte: monthAgo, $lte: now };
+    } else if (period === "year") {
+      const yearAgo = new Date();
+      yearAgo.setFullYear(now.getFullYear() - 1);
+      filter.createdAt = { $gte: yearAgo, $lte: now };
+    }
+
+    // 📊 Hitung total item dan total halaman
+    const total = await Payment.countDocuments(filter);
+    const payments = await Payment.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    // 💰 Hitung total amount keseluruhan (bisa per filter juga)
+    const totalAmountAgg = await Payment.aggregate([
+      { $match: filter },
+      { $group: { _id: null, totalAmount: { $sum: "$amount" } } },
+    ]);
+
+    const totalAmount = totalAmountAgg[0]?.totalAmount || 0;
+
+    res.status(200).json({
+      success: true,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalItems: total,
+      totalAmount, // ⬅️ kirim totalAmount ke frontend
+      data: payments,
+    });
+  } catch (error) {
+    console.error("❌ getFilteredPayments Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch filtered payments",
+      error: error.message,
+    });
+  }
+};
+
+module.exports = {
+  createOrder,
+  verifyPayment,
+  webHookVerification,
+  getAllPayment,
+  getFilteredPayments,
+};

@@ -16,7 +16,7 @@ connetDB();
 app.use(
   cors({
     credentials: true,
-    origin: ["http://localhost:5173"],
+    origin: ["http://localhost:5173", "https://pos-frontend-jet.vercel.app"],
   })
 );
 app.use(express.json());
@@ -32,7 +32,9 @@ app.use("/api/user", require("./routes/userRoute"));
 app.use("/api/order", require("./routes/orderRoute"));
 app.use("/api/table", require("./routes/tableRoute"));
 app.use("/api/payment", require("./routes/paymentRoute"));
-
+app.use("/api/categories", require("./routes/categoryRoute"));
+app.use("/api/dishes", require("./routes/dishRoute"));
+app.use("/api/dashboard", require("./routes/dashboardRoute"));
 // Global Error Handler
 app.use(globalErrorHandler);
 

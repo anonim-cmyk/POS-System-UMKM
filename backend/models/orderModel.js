@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const orderSchema = new mongoose.Schema(
   {
+    order_id: {
+      type: String,
+      required: false,
+      unique: true,
+    },
     customerDetails: {
       name: {
         type: String,
@@ -31,6 +36,7 @@ const orderSchema = new mongoose.Schema(
     },
     items: [],
     table: { type: mongoose.Schema.Types.ObjectId, ref: "Table" },
+    paymentMethod: String,
   },
   { timestamps: true }
 );

@@ -5,10 +5,14 @@ const {
   createOrder,
   verifyPayment,
   webHookVerification,
+  getAllPayment,
+  getFilteredPayments,
 } = require("../controllers/paymentController");
 
 router.route("/create-order").post(isVerifiedUser, createOrder);
 router.route("/verify-payment").post(isVerifiedUser, verifyPayment);
 router.post("/webhook", webHookVerification);
 
+router.get("/filtered", getFilteredPayments);
+router.get("/", getAllPayment);
 module.exports = router;

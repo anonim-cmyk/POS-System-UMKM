@@ -1,43 +1,54 @@
-import { useMutation } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useState } from "react";
 import { IoMdClose } from "react-icons/io";
-import { addTable } from "../../https";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { enqueueSnackbar } from "notistack";
+import { addTable, updatedTable } from "../../https";
 
-const Modal = ({ setIsTableModalOpen }) => {
-  const [tableData, setTableData] = useState({
-    tableNo: "",
-    seats: "",
-  });
+const Modal = ({ setIsTableModalOpen, editingTable, setEditingTable }) => {
+  console.log(editingTable);
+
+  const [tableData, setTableData] = useState({ tableNo: "", seats: "" });
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (editingTable) {
+      setTableData(editingTable);
+    }
+  }, [editingTable]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setTableData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log(tableData);
-    tableMutation.mutate(tableData);
-  };
-
-  const tableMutation = useMutation({
-    mutationFn: (reqData) => addTable(reqData),
+  const mutation = useMutation({
+    mutationFn: async () => {
+      return editingTable
+        ? updatedTable({ tableId: editingTable._id, ...tableData })
+        : addTable(tableData);
+    },
     onSuccess: (res) => {
-      setIsTableModalOpen(false);
-      const { data } = res;
-      enqueueSnackbar(data.message, { variant: "success" });
+      enqueueSnackbar(res.data.message, { variant: "success" });
+      queryClient.invalidateQueries(["tables"]);
+      handleClose();
     },
     onError: (error) => {
-      const { data } = error.response;
-      enqueueSnackbar(data.message, { variant: "error" });
+      enqueueSnackbar(error.response.data.message, { variant: "error" });
     },
   });
 
-  const handleCloseModal = () => {
-    setIsTableModalOpen(false);
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    mutation.mutate();
   };
+
+  const handleClose = () => {
+    setIsTableModalOpen(false);
+    setEditingTable(null);
+    setTableData({ tableNo: "", seats: "" });
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <motion.div
@@ -47,54 +58,48 @@ const Modal = ({ setIsTableModalOpen }) => {
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className="bg-[#262626] p-6 rounded-lg shadow-lg w-96"
       >
-        {/* Modal Header */}
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-[#f5f5f5] text-xl font-semibold">Add Table</h2>
+        <div className="flex justify-between mb-4">
+          <h2 className="text-white text-xl font-semibold">
+            {editingTable ? "Edit Table" : "Add Table"}
+          </h2>
           <button
-            onClick={() => handleCloseModal()}
-            className="text-[#f5f5f5] hover:text-red-500 hover:cursor-pointer"
+            onClick={handleClose}
+            className="text-white hover:text-red-500"
           >
-            <IoMdClose />
+            <IoMdClose size={20} />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="space-y-4 mt-10">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-6">
           <div>
-            <label className="block text-white mb-2 mt-3 text-sm font-medium">
-              Table Number
-            </label>
-            <div className="flex items-center rounded-lg p-5 px-4 bg-[#1f1f1f]">
-              <input
-                type="number"
-                value={tableData.tableNo}
-                onChange={handleInputChange}
-                name="tableNo"
-                className="bg-transparent flex-1 text-white focus:outline-none"
-                required
-              />
-            </div>
+            <label className="text-white text-sm">Table Number</label>
+            <input
+              type="number"
+              name="tableNo"
+              value={tableData.tableNo}
+              onChange={handleInputChange}
+              required
+              className="w-full bg-[#1f1f1f] text-white p-3 rounded mt-1"
+            />
           </div>
+
           <div>
-            <label className="block text-white mb-2 mt-3 text-sm font-medium">
-              Number of seats
-            </label>
-            <div className="flex items-center rounded-lg p-5 px-4 bg-[#1f1f1f]">
-              <input
-                type="number"
-                value={tableData.seats}
-                onChange={handleInputChange}
-                name="seats"
-                className="bg-transparent flex-1 text-white focus:outline-none"
-                required
-              />
-            </div>
+            <label className="text-white text-sm">Seats</label>
+            <input
+              type="number"
+              name="seats"
+              value={tableData.seats}
+              onChange={handleInputChange}
+              required
+              className="w-full bg-[#1f1f1f] text-white p-3 rounded mt-1"
+            />
           </div>
+
           <button
             type="submit"
-            className="w-full mt-6 px-4 py-3 rounded-lg bg-yellow-400 text-gray-900 font-bold hover:cursor-pointer"
+            className="w-full bg-yellow-400 text-black font-bold py-3 rounded"
           >
-            Add Table
+            {editingTable ? "Update Table" : "Add Table"}
           </button>
         </form>
       </motion.div>

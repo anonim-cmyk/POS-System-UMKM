@@ -1,3 +1,5 @@
+import { getOrders } from "../https";
+import { useQuery } from "@tanstack/react-query";
 import Greetings from "../components/home/Greetings";
 import MiniCard from "../components/home/MiniCard";
 import PopularDishes from "../components/home/PopularDishes";
@@ -7,6 +9,29 @@ import { BsCashCoin } from "react-icons/bs";
 import { GrInProgress } from "react-icons/gr";
 
 const Home = () => {
+  const { data } = useQuery({
+    queryKey: ["orders"],
+    queryFn: getOrders,
+  });
+
+  const orders = Array.isArray(data?.data?.data) ? data.data.data : [];
+
+  // ✅ Hitung Total Earnings berdasarkan totalWithTax dari order completed
+  const totalEarnings = orders
+    .filter((o) => o.orderStatus === "Completed")
+    .reduce((sum, o) => sum + (o.bills?.totalWithTax || 0), 0);
+
+  // ✅ Hitung order sedang diproses
+  const inProgress = orders.filter((o) => o.orderStatus !== "Completed").length;
+
+  // ✅ Format Rupiah
+  const formatRupiah = (value) =>
+    new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(value);
+
   return (
     <>
       <section className="bg-[#1f1f1f] min-h-screen flex gap-3 pb-20">
@@ -16,14 +41,14 @@ const Home = () => {
             <MiniCard
               title="Total Earnings"
               icon={<BsCashCoin />}
-              number={512}
+              number={formatRupiah(totalEarnings)}
               footerNum={1.6}
             />
             <MiniCard
               title="In Progress"
               icon={<GrInProgress />}
-              number={512}
-              footerNum={1.6}
+              number={inProgress}
+              footerNum={2.4}
             />
           </div>
           <RecentOrders />

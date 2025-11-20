@@ -1,5 +1,5 @@
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
-import { Home, Auth, Orders, Tables, Menu } from "../src/pages";
+import { Home, Auth, Orders, Tables, Menu, More } from "../src/pages";
 import Header from "../src/components/shared/Header";
 import Layout from "../src/layout/Layout";
 import { useSelector } from "react-redux";
@@ -63,6 +63,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoutes>
             <Dashboard />
+          </ProtectedRoutes>
+        ),
+      },
+      {
+        path: "/more",
+        element: (
+          <ProtectedRoutes>
+            <More />
           </ProtectedRoutes>
         ),
       },

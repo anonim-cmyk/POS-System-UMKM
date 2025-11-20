@@ -7,6 +7,10 @@ const paymentSchema = new mongoose.Schema({
   currency: String,
   status: String,
   method: String,
+  customerName: { type: String, default: "Guest" }, // ✅ Tambahkan ini
+  customerPhone: { type: String, default: "-" }, // ✅ Tambahkan ini
+  tableNo: { type: Number },
+  tableId: { type: String },
   email: String,
   contact: String,
   createdAt: Date,
