@@ -16,7 +16,7 @@ connectDB();
 app.use(
   cors({
     credentials: true,
-    origin: ["http://localhost:5173", "https://pos-frontend-jet.vercel.app"],
+    origin: ["http://localhost:5173", "https://post-frontend-five.vercel.app"],
   })
 );
 app.use(express.json());
