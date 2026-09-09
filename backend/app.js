@@ -10,7 +10,16 @@ const cors = require("cors");
 const app = express();
 
 const PORT = config.port;
-connectDB();
+
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Middlewares
 // Parse incoming request in json format
 app.use(
