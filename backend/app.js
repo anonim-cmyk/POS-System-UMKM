@@ -40,7 +40,12 @@ app.use("/api/dashboard", require("./routes/dashboardRoute"));
 // Global Error Handler
 app.use(globalErrorHandler);
 
+module.exports = app;
+
 // server
-app.listen(PORT, () => {
-  console.log(`POS Server is listeing on PORT: ${PORT}`);
-});
+
+if (process.env.NODE_ENV !== "production") {
+  app.listen(PORT, () => {
+    console.log(`POS Server is listeing on PORT: ${PORT}`);
+  });
+}
